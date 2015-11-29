@@ -71,8 +71,9 @@ mflo %reg
 #########################################
 main: 
 	la $a0, testprintsol
-	la $a1, 1
-	jal colSet
+	la $a1, 0
+	la $a2, 0
+	jal gridSet
 	#print_int($v0) 
 	end
 	
@@ -210,6 +211,49 @@ printSolution:
 # public (byte [], int) gridSet (byte[][] board, int row, int col)
 #
 gridSet:
+	li $t0, 3
+	div $a1, $t0
+	mflo $a1	#divide by 3
+	div $a2, $t0
+	mflo $a2	#divide by 3
+	
+	mul $a1, $a1, $t0
+	mflo $a1	#multiply by 3
+	mul $a2, $a2, $t0
+	mflo $a2	#multiply by 3 
+	
+	li $t0, 0	#count 
+	addi $t1, $a1, 3	#loop counter 
+	addi $t2, $a2, 3	#loop counter 
+	la $s1, gSet
+	move $s3, $a2		#original row counter 
+	gridouterloop:
+		
+		innergridloop:
+		move $s0, $a0
+		board_value($s0, $a1, $a2)
+		beqz $v0, nextinnergridloop
+		
+		la $s2, ($s1)
+		mulby4($t0)
+		add $s2, $s2, $t0
+		sw $v0, ($s2)
+		divby4($t0)
+		addi $t0, $t0, 1
+		addi $a2, $a2, 1
+		blt $a2, $t2, innergridloop
+		j nextouterloop
+		
+		nextinnergridloop:
+		addi $a2, $a2, 1
+		j innergridloop
+	
+	nextouterloop:
+	addi $a1, $a1, 1
+	move $a2, $s3	
+	blt $a1, $t1, gridouterloop
+	
+	move $v0, $t0
 	jr $ra
 
 #
@@ -287,7 +331,7 @@ solution: .asciiz "Solution:"
 space: .asciiz " "
 nextline: .asciiz "\n"
 .align 2
-testprintsol: .word 1, 2, 3, 4, 5, 6, 7, 8, 9, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 1
+testprintsol: .word 1, 2, 3, 4, 5, 6, 7, 8, 9, 9, 8, 7, 6, 5, 4, 3, 2, 1, 2, 4, 6, 8, 6, 4, 2, 1, 6
 .align 2
 rSet: 		.byte 0:9
 .align 2
