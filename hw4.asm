@@ -46,14 +46,11 @@ syscall
 
 .macro board_value(%board, %row, %col)
 li $t9, 9
-li $t8, 4
 mul $t9, $t9, %row
 mflo $t9
 add $t9, $t9, %col
-mul $t9, $t9, $t8
-mflo $t9
 add %board, %board, $t9
-lw $t9, (%board)
+lb $t9, (%board)
 move $v0, $t9
 .end_macro
 
@@ -68,12 +65,37 @@ li $t9, 4
 div %reg, $t9
 mflo %reg
 .end_macro
+
+.macro searchsets(%address, %object)
+li $t8, 0
+loopsearch:
+lb $t9, (%address)
+beq $t9, %object, truesearch
+addi %address, %address, 1
+addi $t8, $t8, 1
+blt $t8, 9, loopsearch
+j falsesearch
+
+truesearch:
+li $v0, 1
+j endsearch
+
+falsesearch:
+li $v0, 0
+j endsearch
+
+endsearch:
+.end_macro
+
 #########################################
 main: 
-	la $a0, testprintsol
-	la $a1, 0
+	
+	
+	la $a0, test
+	la $a1, 1
 	la $a2, 0
-	jal gridSet
+	la $a3, candidates
+	jal constructCandidates
 	#print_int($v0) 
 	end
 	
@@ -211,6 +233,12 @@ printSolution:
 # public (byte [], int) gridSet (byte[][] board, int row, int col)
 #
 gridSet:
+	sw $s0, ($sp)
+	sw $s1, 4($sp)
+	sw $s2, 8($sp)
+	sw $s3, 12($sp)
+	
+	
 	li $t0, 3
 	div $a1, $t0
 	mflo $a1	#divide by 3
@@ -218,9 +246,9 @@ gridSet:
 	mflo $a2	#divide by 3
 	
 	mul $a1, $a1, $t0
-	mflo $a1	#multiply by 3
+	mflo $a1	#multiply by 3 stored in a1
 	mul $a2, $a2, $t0
-	mflo $a2	#multiply by 3 
+	mflo $a2	#multiply by 3 stored in a2
 	
 	li $t0, 0	#count 
 	addi $t1, $a1, 3	#loop counter 
@@ -235,10 +263,10 @@ gridSet:
 		beqz $v0, nextinnergridloop
 		
 		la $s2, ($s1)
-		mulby4($t0)
+		#mulby4($t0)
 		add $s2, $s2, $t0
-		sw $v0, ($s2)
-		divby4($t0)
+		sb $v0, ($s2)
+		#divby4($t0)
 		addi $t0, $t0, 1
 		addi $a2, $a2, 1
 		blt $a2, $t2, innergridloop
@@ -246,6 +274,7 @@ gridSet:
 		
 		nextinnergridloop:
 		addi $a2, $a2, 1
+		bge  $a2, $t2, nextouterloop
 		j innergridloop
 	
 	nextouterloop:
@@ -253,6 +282,11 @@ gridSet:
 	move $a2, $s3	
 	blt $a1, $t1, gridouterloop
 	
+	
+	lw $s0, ($sp)
+	lw $s1, 4($sp)
+	lw $s2, 8($sp)
+	lw $s3, 12($sp)
 	move $v0, $t0
 	jr $ra
 
@@ -261,25 +295,32 @@ gridSet:
 # public (byte [], int) colSet (byte[][] board, int col)
 #	
 colSet:
+	sw $s0, ($sp)
+	sw $s1, 4($sp)
+	sw $s2, 8($sp)
+	
 	li $t0, 0	#counter
 	li $t1, 0	#loop
 	la $s1, cSet
 	colSetLoop:
 		move $s0, $a0
-		board_value($s0, $t0, $a1)
+		board_value($s0, $t1, $a1)
 		beqz $v0, nextcolsetloop
 		
 		la $s2, ($s1)
-		mulby4($t0)
+		#mulby4($t0)
 		add $s2, $s2, $t0
-		sw $v0, ($s2)
-		divby4($t0)
+		sb $v0, ($s2)
+		#divby4($t0)
 		addi $t0, $t0, 1
 		
 		nextcolsetloop:
 		addi $t1, $t1, 1
 		blt $t1, 9, colSetLoop
 	
+	lw $s0, ($sp)
+	lw $s1, 4($sp)
+	lw $s2, 8($sp)
 	move $v0, $t0
 	
 	jr $ra
@@ -289,24 +330,32 @@ colSet:
 # public (byte [], int) rowSet (byte[][] board, int row)
 #		
 rowSet:
+	sw $s0, ($sp)
+	sw $s1, 4($sp)
+	sw $s2, 8($sp)
+	
 	li $t0, 0	#count 
 	li $t1, 0	#loopcounter
 	la $s1, rSet
 	rowSetLoop:
 		move $s0, $a0
-		board_value($s0, $a1, $t0)
+		board_value($s0, $a1, $t1)
 		beqz $v0, nextrowsetloop
 		
 		la $s2, ($s1)
-		mulby4($t0)
+		#mulby4($t0)
 		add $s2, $s2, $t0
-		sw $v0, ($s2)
-		divby4($t0)
+		sb $v0, ($s2)
+		#divby4($t0)
 		addi $t0, $t0, 1
 		
 		nextrowsetloop:
 		addi $t1, $t1, 1
 		blt $t1, 9, rowSetLoop
+	
+	lw $s0, ($sp)
+	lw $s1, 4($sp)
+	lw $s2, 8($sp)
 	
 	move $v0, $t0
 	jr $ra
@@ -316,6 +365,62 @@ rowSet:
 # public (byte [], int) colSet (byte[][] board, int row, int col)
 #			
 constructCandidates:
+	
+	sw $s0, ($sp)
+	sw $s1, 4($sp)
+	sw $s2, 8($sp)
+	sw $s3, 12($sp)
+	sw $s4, 16($sp)
+	sw $s5, 20($sp)
+	
+	li $s0, 0 	#count 
+	la $s5, ($ra)
+	jal rowSet
+	move $s1, $v0	#rlength
+	
+	swap($a1, $a2)
+	jal colSet 
+	move $s2, $v0	#clength
+	
+	swap ($a1, $a2)
+	jal gridSet
+	move $s3, $v0	#glength
+	
+	li $t0, 1	#loop counter or i
+	
+	candidateloop:
+		la $s4, rSet
+		searchsets($s4, $t0)
+		beq $v0, 1, nextcandidateloop
+		
+		la $s4, cSet
+		searchsets($s4, $t0)
+		beq $v0, 1, nextcandidateloop
+		
+		la $s4, gSet
+		searchsets($s4, $t0)
+		beq $v0, 1, nextcandidateloop
+		
+		addtocount:
+		sb $t0, ($a3)
+		addi $s0, $s0, 1
+		addi $a3, $a3, 1
+		
+		nextcandidateloop:
+		addi $t0, $t0, 1
+		ble $t0, 9, candidateloop
+	
+		
+	move $v0, $s0
+	move $ra, $s5
+	
+	lw $s0, ($sp)
+	lw $s1, 4($sp)
+	lw $s2, 8($sp)
+	lw $s3, 12($sp)
+	lw $s4, 16($sp)
+	lw $s5, 20($sp)
+	
 	jr $ra
 
 #
@@ -331,11 +436,19 @@ solution: .asciiz "Solution:"
 space: .asciiz " "
 nextline: .asciiz "\n"
 .align 2
-testprintsol: .word 1, 2, 3, 4, 5, 6, 7, 8, 9, 9, 8, 7, 6, 5, 4, 3, 2, 1, 2, 4, 6, 8, 6, 4, 2, 1, 6
-.align 2
+test: 		.byte 1,2,0,4,5,6,7,8,9,
+		      0,0,7,6,5,4,3,2,1,
+		      0,4,6,8,4,2,2,3,1,
+		      0,2,1,4,5,2,3,4,7,
+		      0,0,4,2,4,3,1,4,3,
+		      5,6,2,3,2,1,3,3,2,
+		      4,2,0,6,2,3,4,1,6,
+		      7,3,5,4,7,3,5,7,8,
+		      0,3,2,4,5,3,6,3,3
+		      
 rSet: 		.byte 0:9
-.align 2
 cSet: 		.byte 0:9
-.align 2
 gSet: 		.byte 0:9
+.align 2
+candidates:	.byte 0:9
 FINISHED: 	.byte 0
