@@ -26,6 +26,11 @@ lw $a1, 8($sp)
 lw $a2, 12($sp)
 .end_macro
 
+.macro loadfromstacksud
+lw $a1, 4($sp)
+lw $a2, 8($sp)
+.end_macro
+
 .macro print_string(%string)
 li $v0, 4
 la $a0, %string
@@ -46,24 +51,32 @@ syscall
 
 .macro board_value(%board, %row, %col)
 li $t9, 9
+la $t8, (%board)
 mul $t9, $t9, %row
 mflo $t9
 add $t9, $t9, %col
 add %board, %board, $t9
 lb $t9, (%board)
 move $v0, $t9
+move %board, $t8
 .end_macro
 
-.macro mulby4(%reg)
-li $t9, 4
-mul %reg, %reg, $t9
-mflo %reg
+.macro setboardvalue(%board, %row, %col, %value)
+li $t9, 9
+la $t8, (%board)
+mul $t9, $t9, %row
+mflo $t9
+add $t9, $t9, %col
+add %board, %board, $t9
+sb %value, (%board)
+move %board, $t8
 .end_macro
 
-.macro divby4(%reg)
-li $t9, 4
-div %reg, $t9
-mflo %reg
+.macro getcandidatearrayvalue(%candidatearray, %int) 
+la $t9, (%candidatearray)
+add %candidatearray, %candidatearray, %int
+lb $v0, (%candidatearray)
+move %candidatearray, $t9
 .end_macro
 
 .macro searchsets(%address, %object)
@@ -92,11 +105,10 @@ main:
 	
 	
 	la $a0, test
-	la $a1, 1
-	la $a2, 0
-	la $a3, candidates
-	jal constructCandidates
-	#print_int($v0) 
+	la $a1, 0
+	la $a2, -1
+	jal sudoku
+	
 	end
 	
 #
@@ -209,18 +221,19 @@ false:
 # public void printSolution (byte[][] board)
 #
 printSolution:
-	la $s0, ($a0)
+	
+	la $t3, ($a0)
 	print_string(solution)
 	print_line
 	li $t0, 0	# counter for i
 	outerlooppSol:
 	li $t1, 0	#counter for j
 		innerlooppSol:
-		lw $t2, ($s0)
+		lw $t2, ($t3)
 		print_int($t2)
 		print_space
 		addi $t1, $t1, 1
-		addi $s0, $s0, 4
+		addi $t3, $t3, 4
 		blt $t1, 9, innerlooppSol
 	print_line
 	addi $t0, $t0, 1	
@@ -233,6 +246,7 @@ printSolution:
 # public (byte [], int) gridSet (byte[][] board, int row, int col)
 #
 gridSet:
+	addi $sp, $sp, -16
 	sw $s0, ($sp)
 	sw $s1, 4($sp)
 	sw $s2, 8($sp)
@@ -287,6 +301,7 @@ gridSet:
 	lw $s1, 4($sp)
 	lw $s2, 8($sp)
 	lw $s3, 12($sp)
+	addi $sp, $sp, 16
 	move $v0, $t0
 	jr $ra
 
@@ -295,6 +310,7 @@ gridSet:
 # public (byte [], int) colSet (byte[][] board, int col)
 #	
 colSet:
+	addi $sp, $sp, -12
 	sw $s0, ($sp)
 	sw $s1, 4($sp)
 	sw $s2, 8($sp)
@@ -321,6 +337,7 @@ colSet:
 	lw $s0, ($sp)
 	lw $s1, 4($sp)
 	lw $s2, 8($sp)
+	addi $sp, $sp, 12
 	move $v0, $t0
 	
 	jr $ra
@@ -330,6 +347,7 @@ colSet:
 # public (byte [], int) rowSet (byte[][] board, int row)
 #		
 rowSet:
+	addi $sp, $sp, -12
 	sw $s0, ($sp)
 	sw $s1, 4($sp)
 	sw $s2, 8($sp)
@@ -356,7 +374,7 @@ rowSet:
 	lw $s0, ($sp)
 	lw $s1, 4($sp)
 	lw $s2, 8($sp)
-	
+	addi $sp, $sp, 12
 	move $v0, $t0
 	jr $ra
 
@@ -365,16 +383,18 @@ rowSet:
 # public (byte [], int) colSet (byte[][] board, int row, int col)
 #			
 constructCandidates:
-	
+	addi $sp, $sp, -28
 	sw $s0, ($sp)
 	sw $s1, 4($sp)
 	sw $s2, 8($sp)
 	sw $s3, 12($sp)
 	sw $s4, 16($sp)
 	sw $s5, 20($sp)
+	sw $s6, 24($sp)
 	
 	li $s0, 0 	#count 
 	la $s5, ($ra)
+	move $s6, $a3
 	jal rowSet
 	move $s1, $v0	#rlength
 	
@@ -413,6 +433,7 @@ constructCandidates:
 		
 	move $v0, $s0
 	move $ra, $s5
+	move $a3, $s6
 	
 	lw $s0, ($sp)
 	lw $s1, 4($sp)
@@ -420,7 +441,8 @@ constructCandidates:
 	lw $s3, 12($sp)
 	lw $s4, 16($sp)
 	lw $s5, 20($sp)
-	
+	lw $s6, 24($sp)
+	addi $sp, $sp, 28
 	jr $ra
 
 #
@@ -428,6 +450,90 @@ constructCandidates:
 # public (byte [], int) colSet (byte[][] board, int x, int y)
 #	
 sudoku:
+	addi $sp, $sp, -12
+	sw $ra, 0($sp)
+	sw $a1, 4($sp)
+	sw $a2, 8($sp)
+	
+	move $s0, $a0		#board address
+	move $s1, $a1		#board x
+	move $s2, $a2		#board y
+	
+	move $a0, $s1
+	move $a1, $s2
+	jal isSolution
+	
+	beq $v0, 1, endsudoku	#if it is a solution end the method
+	
+	addi $s2, $s2, 1
+	
+	bgt $s2, 8, firstcolnextrow
+	j nextcolsamerow
+	
+		firstcolnextrow:
+		addi $s1, $s1, 1
+		li $s2, 0
+	
+	nextcolsamerow:
+	board_value($s0, $s1, $s2)
+	beqz $v0, checkcandidate
+	j keepsolving
+	
+		keepsolving:
+		move $a0, $s0
+		move $a1, $s1
+		move $a2, $s2
+		jal sudoku
+		loadfromstacksud
+		
+		
+		checkcandidate:
+		move $a0, $s0
+		move $a1, $s1
+		move $a2, $s2
+		la $fp, 0($sp)
+		move $a3, $fp
+		jal constructCandidates
+		
+		li $t0, 0	#c
+		move $t1, $v0	#candidate length
+		
+		
+		
+		candidateloopsud:
+			getcandidatearrayvalue($a3, $t0)
+			setboardvalue($s0, $s1, $s2, $v0)
+			move $a0, $s0
+			move $a1, $s1
+			move $a2, $s2
+			jal sudoku
+			loadfromstacksud
+			
+			setboardvalue($s0, $s1, $s2, $0)
+			
+			lb $t2, FINISHED
+			beq $t2, 1, returnsud
+			j nextcandidateloopsud
+			
+			returnsud:
+			jr $ra
+				
+			nextcandidateloopsud:
+			addi $t0, $t0, 1
+			blt $t0, $t1, candidateloopsud
+		
+		
+		######################## do later 
+		
+	
+	
+	endsudoku:		#print out board
+	move $a0, $s0
+	jal printSolution
+	
+	li $t0, 1
+	sb $t0, FINISHED
+	addi $sp, $sp, 12
 	jr $ra
 
 
@@ -436,7 +542,7 @@ solution: .asciiz "Solution:"
 space: .asciiz " "
 nextline: .asciiz "\n"
 .align 2
-test: 		.byte 1,2,0,4,5,6,7,8,9,
+test: 		.byte 3,0,3,0,5,6,7,8,9,
 		      0,0,7,6,5,4,3,2,1,
 		      0,4,6,8,4,2,2,3,1,
 		      0,2,1,4,5,2,3,4,7,
