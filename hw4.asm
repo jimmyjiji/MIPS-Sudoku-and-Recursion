@@ -4,14 +4,28 @@
 ########################################
 ### MACROS USED ########################
 .macro print_int(%string)
+move $t9, $a0
 move $a0, %string
 li $v0, 1
 syscall 
+move $a0, $t9
 .end_macro
 
 .macro end
 li $v0, 10
 syscall
+.end_macro
+
+.macro clearSet(%set) 
+sb $0, 0(%set)
+sb $0, 1(%set)
+sb $0, 2(%set)
+sb $0, 3(%set)
+sb $0, 4(%set)
+sb $0, 5(%set)
+sb $0, 6(%set)
+sb $0, 7(%set)
+sb $0, 8(%set)
 .end_macro
 
 .macro swap(%reg1, %reg2)
@@ -27,26 +41,33 @@ lw $a2, 12($sp)
 .end_macro
 
 .macro loadfromstacksud
-lw $a1, 4($sp)
-lw $a2, 8($sp)
+lw $s3, 12($sp)
+lw $s1, 16($sp)
+lw $s2, 20($sp)
 .end_macro
 
 .macro print_string(%string)
+move $t9, $a0
 li $v0, 4
 la $a0, %string
 syscall
+move $a0, $t9
 .end_macro
 
 .macro print_space
+move $t9, $a0
 li $v0, 4
-la $a0,space
+la $a0, space
 syscall
+move $a0, $t9
 .end_macro
 
 .macro print_line
+move $t9, $a0
 li $v0, 4
 la $a0, nextline
 syscall
+move $a0, $t9
 .end_macro
 
 .macro board_value(%board, %row, %col)
@@ -229,11 +250,11 @@ printSolution:
 	outerlooppSol:
 	li $t1, 0	#counter for j
 		innerlooppSol:
-		lw $t2, ($t3)
+		lb $t2, ($t3)
 		print_int($t2)
 		print_space
 		addi $t1, $t1, 1
-		addi $t3, $t3, 4
+		addi $t3, $t3, 1
 		blt $t1, 9, innerlooppSol
 	print_line
 	addi $t0, $t0, 1	
@@ -253,6 +274,7 @@ gridSet:
 	sw $s3, 12($sp)
 	
 	
+	
 	li $t0, 3
 	div $a1, $t0
 	mflo $a1	#divide by 3
@@ -268,6 +290,7 @@ gridSet:
 	addi $t1, $a1, 3	#loop counter 
 	addi $t2, $a2, 3	#loop counter 
 	la $s1, gSet
+	clearSet($s1)
 	move $s3, $a2		#original row counter 
 	gridouterloop:
 		
@@ -318,6 +341,7 @@ colSet:
 	li $t0, 0	#counter
 	li $t1, 0	#loop
 	la $s1, cSet
+	clearSet($s1)
 	colSetLoop:
 		move $s0, $a0
 		board_value($s0, $t1, $a1)
@@ -352,9 +376,12 @@ rowSet:
 	sw $s1, 4($sp)
 	sw $s2, 8($sp)
 	
+	
+	
 	li $t0, 0	#count 
 	li $t1, 0	#loopcounter
 	la $s1, rSet
+	clearSet($s1)
 	rowSetLoop:
 		move $s0, $a0
 		board_value($s0, $a1, $t1)
@@ -450,14 +477,22 @@ constructCandidates:
 # public (byte [], int) colSet (byte[][] board, int x, int y)
 #	
 sudoku:
-	addi $sp, $sp, -12
-	sw $ra, 0($sp)
-	sw $a1, 4($sp)
-	sw $a2, 8($sp)
+	addi $sp, $sp, -32
+	li $t9, 0
+	sw $t9, 0($sp)
+	sw $t9, 4($sp)
+	sw $t9, 8($sp)
+	sw $ra, 12($sp)
+	sw $a1, 16($sp)
+	sw $a2, 20($sp)
+	sw $t9, 24($sp)
+	sw $t9, 28($sp)
 	
 	move $s0, $a0		#board address
 	move $s1, $a1		#board x
 	move $s2, $a2		#board y
+	move $s3, $ra 
+	
 	
 	move $a0, $s1
 	move $a1, $s2
@@ -485,46 +520,58 @@ sudoku:
 		move $a2, $s2
 		jal sudoku
 		loadfromstacksud
-		
+		addi $sp, $sp, 32
+		jr $s3
 		
 		checkcandidate:
 		move $a0, $s0
 		move $a1, $s1
 		move $a2, $s2
-		la $fp, 0($sp)
+		la $fp, 8($sp)
 		move $a3, $fp
 		jal constructCandidates
 		
 		li $t0, 0	#c
 		move $t1, $v0	#candidate length
+		sw $t0, 24($sp)
+		sw $t1, 28($sp)
 		
+		checker:
+		blt $t0, $t1, candidateloopsud
 		
+		j returnsud
 		
 		candidateloopsud:
 			getcandidatearrayvalue($a3, $t0)
 			setboardvalue($s0, $s1, $s2, $v0)
+			#jal printSolution
 			move $a0, $s0
+			
 			move $a1, $s1
 			move $a2, $s2
 			jal sudoku
 			loadfromstacksud
+			la $fp, 8($sp)
+			lw $t0, 24($sp)
+			lw $t1, 28($sp)
+			addi $sp, $sp, 32
 			
 			setboardvalue($s0, $s1, $s2, $0)
+			
+			
 			
 			lb $t2, FINISHED
 			beq $t2, 1, returnsud
 			j nextcandidateloopsud
 			
 			returnsud:
-			jr $ra
+			jr $s3
 				
 			nextcandidateloopsud:
 			addi $t0, $t0, 1
-			blt $t0, $t1, candidateloopsud
-		
-		
-		######################## do later 
-		
+			j checker
+			
+			
 	
 	
 	endsudoku:		#print out board
@@ -533,8 +580,8 @@ sudoku:
 	
 	li $t0, 1
 	sb $t0, FINISHED
-	addi $sp, $sp, 12
-	jr $ra
+	addi $sp, $sp, 32
+	jr $s3
 
 
 .data
@@ -542,19 +589,21 @@ solution: .asciiz "Solution:"
 space: .asciiz " "
 nextline: .asciiz "\n"
 .align 2
-test: 		.byte 3,0,3,0,5,6,7,8,9,
-		      0,0,7,6,5,4,3,2,1,
-		      0,4,6,8,4,2,2,3,1,
-		      0,2,1,4,5,2,3,4,7,
-		      0,0,4,2,4,3,1,4,3,
-		      5,6,2,3,2,1,3,3,2,
-		      4,2,0,6,2,3,4,1,6,
-		      7,3,5,4,7,3,5,7,8,
-		      0,3,2,4,5,3,6,3,3
-		      
+test: 	.byte 	0,0,6,8,0,0,5,0,0,	
+ 		0,8,0,0,6,1,0,2,0,	
+		5,0,0,0,3,0,0,0,7,	 
+		0,4,0,3,1,7,0,0,5,	
+		0,9,8,4,0,6,3,7,0,	 
+		7,0,0,2,9,8,0,4,0,	
+		8,0,0,0,4,0,0,0,9,	
+		0,3,0,6,2,0,0,1,0,	
+		0,0,5,0,0,9,6,0,0
+
+.align 2
 rSet: 		.byte 0:9
+.align 2
 cSet: 		.byte 0:9
+.align 2
 gSet: 		.byte 0:9
 .align 2
-candidates:	.byte 0:9
 FINISHED: 	.byte 0
