@@ -121,7 +121,7 @@ endsearch:
 main: 
 	
 	
-	la $a0, test2
+	la $a0, test
 	la $a1, 0
 	la $a2, -1
 	jal sudoku
@@ -456,7 +456,6 @@ constructCandidates:
 		beq $v0, 1, nextcandidateloop
 		
 		addtocount:
-		print_int($t0)
 		sb $t0, ($a3)
 		addi $s0, $s0, 1
 		addi $a3, $a3, 1
@@ -570,8 +569,8 @@ sudoku:
 			loadfromstacksud
 			
 			setboardvalue($s0, $s1, $s2, $0)
-			move $a0, $s0
-			jal printSolution
+			#move $a0, $s0
+			#jal printSolution
 			
 			
 			lb $t5, FINISHED
@@ -602,7 +601,7 @@ sudoku:
 	endsudoku:		#print out board
 	move $a0, $s0
 	jal printSolution
-	
+	end
 	li $t0, 1
 	sb $t0, FINISHED
 	addi $sp, $sp, 32
