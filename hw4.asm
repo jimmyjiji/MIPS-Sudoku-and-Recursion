@@ -1,5 +1,4 @@
 .text
-.globl main
 
 ########################################
 ### MACROS USED ########################
@@ -149,14 +148,6 @@ endsearch:
 .end_macro
 
 #########################################
-main: 
-	
-	
-	la $a0, 5
-	jal F
-	
-	end
-	
 #
 # Computes the Nth number of the Hofsadter Female Sequence
 # public int F (int n)
