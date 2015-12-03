@@ -16,6 +16,37 @@ li $v0, 10
 syscall
 .end_macro
 
+.macro printf (%int) 
+move $t9, $a0
+li $v0, 4
+la $a0, fprint
+syscall
+
+move $a0, $t9
+
+li $v0, 1
+move $a0, %int
+syscall
+
+print_line
+.end_macro
+
+.macro printm (%int)
+move $t9, $a0
+li $v0, 4
+la $a0, mprint
+syscall 
+
+move $a0, $t9
+
+li $v0, 1
+move $a0, %int
+syscall 
+
+print_line
+.end_macro
+
+
 .macro clearSet(%set) 
 sb $0, 0(%set)
 sb $0, 1(%set)
@@ -121,10 +152,8 @@ endsearch:
 main: 
 	
 	
-	la $a0, test
-	la $a1, 0
-	la $a2, -1
-	jal sudoku
+	la $a0, 5
+	jal F
 	
 	end
 	
@@ -136,6 +165,7 @@ F:
 	addi $sp, $sp, -8
 	sw $a0, 0($sp)
 	sw $ra, 4($sp)
+	printf($a0)
 	bnez $a0, elseF
 	li $v0, 1
 	addi $sp, $sp, 8
@@ -161,6 +191,7 @@ M:
 	addi $sp, $sp, -8
 	sw $a0, 0($sp)
 	sw $ra, 4($sp)
+	printm($a0)
 	bnez $a0, elseM
 	li $v0, 0
 	addi $sp, $sp, 8
@@ -505,6 +536,29 @@ sw $t9, 24($sp)
 sw $t9, 28($sp)
 .end_macro
 
+.macro printbeginningsud(%row, %col)
+li $v0, 4
+la $a0, sudoku1
+syscall 
+
+li $v0, 1
+move $a0, %row
+syscall 
+
+li $v0, 4
+la $a0, sudoku2
+syscall
+
+li $v0, 1
+move $a0, %col
+syscall
+
+li $v0, 4
+la $a0, sudoku3
+syscall
+
+print_line
+.end_macro
 sudoku:
 	
 	storetostacksud
@@ -513,6 +567,7 @@ sudoku:
 	move $s2, $a2		#board y
 	move $s3, $ra 
 	
+	printbeginningsud($s1, $s2)
 	
 	move $a0, $s1
 	move $a1, $s2
@@ -569,8 +624,6 @@ sudoku:
 			loadfromstacksud
 			
 			setboardvalue($s0, $s1, $s2, $0)
-			#move $a0, $s0
-			#jal printSolution
 			
 			
 			lb $t5, FINISHED
@@ -601,17 +654,23 @@ sudoku:
 	endsudoku:		#print out board
 	move $a0, $s0
 	jal printSolution
-	end
 	li $t0, 1
 	sb $t0, FINISHED
 	addi $sp, $sp, 32
+	lw $s3, 44($sp)
 	jr $s3
 
 
 .data
 solution: .asciiz "Solution:"
 space: .asciiz " "
+sudoku1: .asciiz "Sudoku [ "
+sudoku2: .asciiz " ] [ "
+sudoku3: .asciiz " ] "
 nextline: .asciiz "\n"
+fprint: .asciiz "F: "
+mprint: .asciiz "M: "
+
 .align 2
 test: 	.byte 	0,0,6,8,0,0,5,0,0,	
  		0,8,0,0,6,1,0,2,0,	
